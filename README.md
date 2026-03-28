@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="Resources/AppIcon-iOS-Default-1024x1024@1x.png" width="128" />
+  <img src="Icon/AppIcon-macOS-Default-1024x1024@1x.png" width="128" />
 </p>
 
 <p align="center">
