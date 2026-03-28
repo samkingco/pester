@@ -1,6 +1,6 @@
 import Foundation
 
-// Usage: echo '{"session_id":"...","tool_name":"Bash",...}' | pester-cli set
+// Usage: echo '{"session_id":"...","tool_name":"Bash","tool_input":{...}}' | pester-cli set
 //        echo '{"session_id":"..."}' | pester-cli clear
 
 guard CommandLine.arguments.count > 1 else {
@@ -27,7 +27,7 @@ let pendingFile = pendingDir.appendingPathComponent("\(sessionId).json")
 
 switch action {
 case "set":
-    let toolName = json["tool_name"] as? String ?? "Tool"
+    let toolName = json["tool_name"] as? String ?? "Waiting"
     let toolInput = json["tool_input"] as? [String: Any] ?? [:]
 
     var summary = ""
@@ -39,11 +39,10 @@ case "set":
         summary = desc
     } else if let message = json["message"] as? String {
         summary = message
+    } else if let title = json["title"] as? String {
+        summary = title
     }
 
-    if summary.count > 120 {
-        summary = String(summary.prefix(117)) + "..."
-    }
 
     let output: [String: Any] = [
         "session_id": sessionId,

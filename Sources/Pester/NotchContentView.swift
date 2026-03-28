@@ -68,10 +68,10 @@ struct ApprovalRow: View {
     let approval: PendingApproval
 
     var body: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 12) {
             ClaudeMascotView(size: 16)
 
-            HStack(spacing: 4) {
+            HStack(spacing: 12) {
                 Text(approval.toolName)
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(.white)
@@ -81,7 +81,7 @@ struct ApprovalRow: View {
                         .font(.system(size: 12, design: .monospaced))
                         .foregroundStyle(.gray)
                         .lineLimit(1)
-                        .truncationMode(.middle)
+                        .truncationMode(.tail)
                 }
             }
 

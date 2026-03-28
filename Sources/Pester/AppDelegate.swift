@@ -55,10 +55,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
         let menu = NSMenu()
         menu.delegate = self
-        menu.addItem(NSMenuItem(title: "Test Notification", action: #selector(triggerTest), keyEquivalent: ""))
+
+        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "?"
+        let versionItem = NSMenuItem(title: "Pester v\(version)", action: nil, keyEquivalent: "")
+        versionItem.isEnabled = false
+
         menu.addItem(NSMenuItem(title: "Clear All", action: #selector(clearAll), keyEquivalent: ""))
-        menu.addItem(.separator())
         menu.addItem(buildSoundMenu())
+        menu.addItem(NSMenuItem(title: "Pester Tester", action: #selector(triggerTest), keyEquivalent: ""))
+        menu.addItem(.separator())
+        menu.addItem(versionItem)
+        menu.addItem(NSMenuItem(title: "GitHub", action: #selector(openGitHub), keyEquivalent: ""))
+        menu.addItem(NSMenuItem(title: "Uninstall…", action: #selector(confirmUninstall), keyEquivalent: ""))
         menu.addItem(.separator())
         menu.addItem(NSMenuItem(title: "Quit Pester", action: #selector(quit), keyEquivalent: "q"))
         statusItem?.menu = menu
@@ -221,6 +229,58 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 item.state = Constants.availableSounds[item.tag] == current ? .on : .off
             }
         }
+    }
+
+    @objc private func confirmUninstall() {
+        let alert = NSAlert()
+        alert.messageText = "Uninstall Pester?"
+        alert.informativeText = "This will remove the app, CLI, Claude Code hooks, and all Pester data."
+        alert.alertStyle = .warning
+        alert.addButton(withTitle: "Uninstall")
+        alert.addButton(withTitle: "Cancel")
+
+        if alert.runModal() == .alertFirstButtonReturn {
+            uninstall()
+        }
+    }
+
+    private func uninstall() {
+        let fm = FileManager.default
+
+        // Remove hooks from Claude Code settings
+        let settingsPath = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent(".claude/settings.json")
+        if let data = try? Data(contentsOf: settingsPath),
+           var settings = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+           var hooks = settings["hooks"] as? [String: [[String: Any]]] {
+            for (key, entries) in hooks {
+                hooks[key] = entries.filter { entry in
+                    guard let hookList = entry["hooks"] as? [[String: Any]] else { return true }
+                    return !hookList.contains { ($0["command"] as? String)?.contains("pester-cli") == true }
+                }
+            }
+            settings["hooks"] = hooks
+            if let updated = try? JSONSerialization.data(withJSONObject: settings, options: .prettyPrinted) {
+                try? updated.write(to: settingsPath)
+            }
+        }
+
+        // Remove ~/.pester
+        let pesterDir = fm.homeDirectoryForCurrentUser.appendingPathComponent(".pester")
+        try? fm.removeItem(at: pesterDir)
+
+        // Remove login item
+        try? SMAppService.mainApp.unregister()
+
+        // Remove the app bundle
+        let appPath = fm.homeDirectoryForCurrentUser.appendingPathComponent("Applications/Pester.app")
+        try? fm.removeItem(at: appPath)
+
+        NSApp.terminate(nil)
+    }
+
+    @objc private func openGitHub() {
+        NSWorkspace.shared.open(URL(string: "https://github.com/samkingco/pester")!)
     }
 
     @objc private func quit() {

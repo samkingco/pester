@@ -19,10 +19,10 @@ enum Constants {
         get {
             guard let data = try? Data(contentsOf: configURL),
                   let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
-            else { return "Glass" }
+            else { return "Blow" }
             if let sound = json["sound"] as? String { return sound }
             if json["sound"] is NSNull { return nil }
-            return "Glass"
+            return "Blow"
         }
         set {
             var json: [String: Any] = [:]
@@ -37,7 +37,7 @@ enum Constants {
         }
     }
 
-    static let expandedWidth: CGFloat = 300
+    static let expandedWidth: CGFloat = 420
     static let rowHeight: CGFloat = 28
     static let countHeaderHeight: CGFloat = 28
     static let bottomPadding: CGFloat = 12
