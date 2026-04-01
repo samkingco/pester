@@ -32,15 +32,16 @@ struct NotchContentView: View {
                 topCornerRadius: isOpen ? 10 : 6,
                 bottomCornerRadius: isOpen ? 18 : 14
             ))
+            .onTapGesture {
+                if isOpen { state.onTap?() }
+            }
 
             Spacer(minLength: 0)
         }
-        .frame(width: Constants.expandedWidth, height: 300, alignment: .top)
+        .frame(width: Constants.expandedWidth)
+        .frame(maxHeight: .infinity, alignment: .top)
         .animation(.spring(duration: 0.35, bounce: 0.12), value: isOpen)
         .animation(.spring(duration: 0.3, bounce: 0.1), value: state.approvals.count)
-        .onTapGesture {
-            if isOpen { state.onTap?() }
-        }
     }
 
     private var contentRows: some View {

@@ -42,11 +42,6 @@ enum Constants {
     static let countHeaderHeight: CGFloat = 28
     static let bottomPadding: CGFloat = 12
 
-    static var pendingDirectory: URL {
-        FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent(".pester/pending")
-    }
-
     // Dynamic notch metrics from the actual display
     static var notchWidth: CGFloat {
         guard let screen = NSScreen.main,

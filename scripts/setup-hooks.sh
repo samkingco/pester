@@ -23,9 +23,6 @@ fi
 # Resolve to absolute path
 CLI="$(cd "$(dirname "$CLI")" && pwd)/$(basename "$CLI")"
 
-# Create pending directory
-mkdir -p "$HOME/.pester/pending"
-
 # Ensure settings file exists
 if [ ! -f "$SETTINGS" ]; then
     mkdir -p "$(dirname "$SETTINGS")"

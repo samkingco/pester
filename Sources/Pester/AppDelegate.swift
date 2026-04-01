@@ -3,29 +3,18 @@ import ServiceManagement
 
 final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var notchWindow: NotchWindow!
-    private var fileWatcher: FileWatcher?
     private var statusItem: NSStatusItem?
-    private var currentApprovals: [PendingApproval] = []
-    private var terminalIsActive = false
+    private var pendingApprovals: [String: PendingApproval] = [:]
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        ensurePendingDirectory()
         setupNotchWindow()
-        setupFileWatcher()
+        setupNotificationObservers()
         setupWorkspaceObserver()
         setupStatusItem()
         registerLoginItem()
-        refreshPendingApprovals()
     }
 
     // MARK: - Setup
-
-    private func ensurePendingDirectory() {
-        try? FileManager.default.createDirectory(
-            at: Constants.pendingDirectory,
-            withIntermediateDirectories: true
-        )
-    }
 
     private func setupNotchWindow() {
         notchWindow = NotchWindow()
@@ -34,10 +23,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
     }
 
-    private func setupFileWatcher() {
-        fileWatcher = FileWatcher(directory: Constants.pendingDirectory) { [weak self] in
-            self?.refreshPendingApprovals()
-        }
+    private func setupNotificationObservers() {
+        let center = DistributedNotificationCenter.default()
+
+        center.addObserver(
+            self,
+            selector: #selector(handleApprovalSet(_:)),
+            name: Notification.Name("com.pester.approval.set"),
+            object: nil
+        )
+
+        center.addObserver(
+            self,
+            selector: #selector(handleApprovalClear(_:)),
+            name: Notification.Name("com.pester.approval.clear"),
+            object: nil
+        )
     }
 
     private func setupWorkspaceObserver() {
@@ -97,7 +98,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         } else {
             let name = Constants.availableSounds[sender.tag]
             Constants.notificationSound = name
-            // Preview the sound
             NSSound(named: NSSound.Name(name))?.play()
         }
     }
@@ -106,39 +106,48 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         try? SMAppService.mainApp.register()
     }
 
-    // MARK: - State
+    // MARK: - Distributed Notifications
 
-    private func refreshPendingApprovals() {
-        let fm = FileManager.default
-        guard let urls = try? fm.contentsOfDirectory(
-            at: Constants.pendingDirectory,
-            includingPropertiesForKeys: nil,
-            options: .skipsHiddenFiles
-        ) else { return }
+    @objc private func handleApprovalSet(_ notification: Notification) {
+        guard let info = notification.userInfo,
+              let sessionId = info["session_id"] as? String,
+              let toolName = info["tool_name"] as? String
+        else { return }
 
-        let approvals = urls
-            .filter { $0.pathExtension == "json" }
-            .compactMap { try? PendingApproval(from: $0) }
+        let summary = info["summary"] as? String ?? ""
+        let isNew = pendingApprovals[sessionId] == nil
+        pendingApprovals[sessionId] = PendingApproval(
+            id: sessionId,
+            toolName: toolName,
+            summary: summary
+        )
 
-        let oldIds = Set(currentApprovals.map(\.id))
-        let newIds = Set(approvals.map(\.id))
-        let hasNewApprovals = !newIds.subtracting(oldIds).isEmpty
+        // Don't show if terminal is focused
+        if isTerminalActive() { return }
 
-        currentApprovals = approvals
+        notchWindow.updateApprovals(Array(pendingApprovals.values))
 
-        // Don't show if terminal is already focused
-        if terminalIsActive && !approvals.isEmpty { return }
-
-        notchWindow.updateApprovals(approvals)
-
-        if hasNewApprovals && !approvals.isEmpty,
+        if isNew,
            let soundName = Constants.notificationSound,
            let sound = NSSound(named: NSSound.Name(soundName))?.copy() as? NSSound {
             sound.play()
         }
     }
 
+    @objc private func handleApprovalClear(_ notification: Notification) {
+        guard let info = notification.userInfo,
+              let sessionId = info["session_id"] as? String
+        else { return }
+
+        pendingApprovals.removeValue(forKey: sessionId)
+        notchWindow.updateApprovals(Array(pendingApprovals.values))
+    }
+
     // MARK: - Workspace
+
+    private func isTerminalActive() -> Bool {
+        NSWorkspace.shared.frontmostApplication?.bundleIdentifier == Constants.terminalBundleId
+    }
 
     @objc private func appDidActivate(_ notification: Notification) {
         guard let app = notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication,
@@ -146,15 +155,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         else { return }
 
         if bundleId == Constants.terminalBundleId {
-            terminalIsActive = true
-            currentApprovals = []
-            clearAllPendingFiles()
+            pendingApprovals.removeAll()
             notchWindow.updateApprovals([])
-        } else {
-            terminalIsActive = false
-            if !currentApprovals.isEmpty {
-                refreshPendingApprovals()
-            }
         }
     }
 
@@ -185,37 +187,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let (tool, summary) = tools.randomElement()!
         let sessionId = "test-\(UUID().uuidString.prefix(8))"
 
-        let json: [String: Any] = [
-            "session_id": sessionId,
-            "tool_name": tool,
-            "summary": summary,
-        ]
-
-        if let data = try? JSONSerialization.data(withJSONObject: json) {
-            let file = Constants.pendingDirectory.appendingPathComponent("\(sessionId).json")
-            try? data.write(to: file)
-        }
+        DistributedNotificationCenter.default().postNotificationName(
+            Notification.Name("com.pester.approval.set"),
+            object: nil,
+            userInfo: [
+                "session_id": sessionId,
+                "tool_name": tool,
+                "summary": summary,
+            ]
+        )
     }
 
     @objc private func clearAll() {
-        clearAllPendingFiles()
-    }
-
-    private func clearAllPendingFiles() {
-        let fm = FileManager.default
-        if let files = try? fm.contentsOfDirectory(
-            at: Constants.pendingDirectory,
-            includingPropertiesForKeys: nil,
-            options: .skipsHiddenFiles
-        ) {
-            for file in files { try? fm.removeItem(at: file) }
-        }
+        pendingApprovals.removeAll()
+        notchWindow.updateApprovals([])
     }
 
     // MARK: - NSMenuDelegate
 
     func menuNeedsUpdate(_ menu: NSMenu) {
-        // Update sound submenu checkmarks
         guard let soundItem = menu.items.first(where: { $0.title == "Sound" }),
               let submenu = soundItem.submenu
         else { return }

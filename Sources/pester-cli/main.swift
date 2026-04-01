@@ -11,11 +11,6 @@ guard CommandLine.arguments.count > 1 else {
 let action = CommandLine.arguments[1]
 let inputData = FileHandle.standardInput.readDataToEndOfFile()
 
-let pendingDir = FileManager.default.homeDirectoryForCurrentUser
-    .appendingPathComponent(".pester/pending")
-try? FileManager.default.createDirectory(at: pendingDir, withIntermediateDirectories: true)
-
-// Parse session_id from input JSON
 guard let json = try? JSONSerialization.jsonObject(with: inputData) as? [String: Any],
       let sessionId = json["session_id"] as? String
 else {
@@ -23,7 +18,7 @@ else {
     exit(1)
 }
 
-let pendingFile = pendingDir.appendingPathComponent("\(sessionId).json")
+let center = DistributedNotificationCenter.default()
 
 switch action {
 case "set":
@@ -43,19 +38,24 @@ case "set":
         summary = title
     }
 
-
-    let output: [String: Any] = [
-        "session_id": sessionId,
-        "tool_name": toolName,
-        "summary": summary,
-    ]
-
-    if let data = try? JSONSerialization.data(withJSONObject: output) {
-        try? data.write(to: pendingFile)
-    }
+    center.postNotificationName(
+        Notification.Name("com.pester.approval.set"),
+        object: nil,
+        userInfo: [
+            "session_id": sessionId,
+            "tool_name": toolName,
+            "summary": summary,
+        ],
+        deliverImmediately: true
+    )
 
 case "clear":
-    try? FileManager.default.removeItem(at: pendingFile)
+    center.postNotificationName(
+        Notification.Name("com.pester.approval.clear"),
+        object: nil,
+        userInfo: ["session_id": sessionId],
+        deliverImmediately: true
+    )
 
 default:
     fputs("Unknown action: \(action). Use 'set' or 'clear'.\n", stderr)

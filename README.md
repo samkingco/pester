@@ -33,19 +33,22 @@ This builds the app, installs it to `~/Applications/Pester.app`, and configures 
 ```
 Claude Code needs approval
   → hook fires
-  → pester-cli writes to ~/.pester/pending/
-  → Pester detects the file, expands from the notch
-  → you click it → terminal focuses → files cleared
+  → pester-cli posts a distributed notification
+  → Pester receives it instantly, expands from the notch
+  → you click it → terminal focuses
 
 Claude Code continues
   → hook fires
-  → pester-cli removes the file
+  → pester-cli posts a clear notification
   → notch collapses
 ```
 
-Detection uses Claude Code's [hooks system](https://docs.anthropic.com/en/docs/claude-code/hooks). Three hooks are added to `~/.claude/settings.json` on install:
+Communication between `pester-cli` and the app uses macOS `DistributedNotificationCenter` — no files, no polling, instant delivery.
 
-- `Notification` (permission_prompt) → `pester-cli set`
+Detection uses Claude Code's [hooks system](https://docs.anthropic.com/en/docs/claude-code/hooks). Hooks are added to `~/.claude/settings.json` on install:
+
+- `PermissionRequest` → `pester-cli set`
+- `Notification` → `pester-cli set`
 - `PostToolUse` → `pester-cli clear`
 - `Stop` → `pester-cli clear`
 

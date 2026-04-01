@@ -27,7 +27,6 @@ install: build assets
 	@cp .build/assets/Assets.car "$(APP_DIR)/Contents/Resources/"
 	@mkdir -p "$(CLI_DIR)"
 	@cp .build/release/pester-cli "$(CLI_DIR)/"
-	@mkdir -p "$(HOME)/.pester/pending"
 	@./scripts/setup-hooks.sh
 	@echo ""
 	@echo "Installed $(APP_NAME) v$(VERSION):"

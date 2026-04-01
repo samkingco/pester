@@ -36,41 +36,66 @@ final class NotchWindow {
         let hosting = NSHostingView(rootView: content)
         panel.contentView = hosting
 
-        positionWindow()
+        resizeWindow(height: Constants.notchHeight)
     }
 
     func updateApprovals(_ approvals: [PendingApproval]) {
-        state.approvals = approvals
+        if !approvals.isEmpty {
+            let targetHeight = contentHeight(for: approvals.count)
+            let currentHeight = contentHeight(for: state.approvals.count)
 
-        if !approvals.isEmpty && !isVisible {
-            positionWindow()
+            // Grow window BEFORE updating state so expand animation isn't clipped
+            if targetHeight > currentHeight || !isVisible {
+                resizeWindow(height: targetHeight)
+            }
+
+            state.approvals = approvals
             panel.ignoresMouseEvents = false
-            panel.orderFrontRegardless()
-            isVisible = true
-        } else if approvals.isEmpty && isVisible {
+
+            if !isVisible {
+                panel.orderFrontRegardless()
+                isVisible = true
+            }
+
+            // Shrink window AFTER animation so collapse isn't clipped
+            if targetHeight < currentHeight {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { [weak self] in
+                    guard let self, !self.state.approvals.isEmpty else { return }
+                    self.resizeWindow(height: self.contentHeight(for: self.state.approvals.count))
+                }
+            }
+        } else if isVisible {
+            state.approvals = []
             panel.ignoresMouseEvents = true
-            // Delay to let SwiftUI collapse animation finish
+
+            // Wait for collapse animation, then hide and shrink
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { [weak self] in
                 guard let self, self.state.approvals.isEmpty else { return }
                 self.panel.orderOut(nil)
                 self.isVisible = false
+                self.resizeWindow(height: Constants.notchHeight)
             }
         }
     }
 
-    // Fixed position: max size, centered at screen top. Never moves.
-    private func positionWindow() {
+    private func contentHeight(for count: Int) -> CGFloat {
+        let notchH = Constants.notchHeight
+        guard count > 0 else { return notchH }
+        let rows = CGFloat(min(count, 5))
+        let header: CGFloat = count > 1 ? Constants.countHeaderHeight : 0
+        return notchH + 8 + header + rows * Constants.rowHeight + Constants.bottomPadding
+    }
+
+    // Pin top edge to screen top, grow/shrink downward
+    private func resizeWindow(height: CGFloat) {
         guard let screen = NSScreen.main else { return }
-
-        let maxW = Constants.expandedWidth
-        let maxH: CGFloat = 300
-
+        let w = Constants.expandedWidth
         let frame = NSRect(
-            x: screen.frame.origin.x + screen.frame.width / 2 - maxW / 2,
-            y: screen.frame.origin.y + screen.frame.height - maxH,
-            width: maxW,
-            height: maxH
+            x: screen.frame.origin.x + screen.frame.width / 2 - w / 2,
+            y: screen.frame.origin.y + screen.frame.height - height,
+            width: w,
+            height: height
         )
-        panel.setFrame(frame, display: false)
+        panel.setFrame(frame, display: true)
     }
 }
