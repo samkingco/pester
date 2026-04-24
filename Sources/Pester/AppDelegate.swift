@@ -5,6 +5,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var notchWindow: NotchWindow!
     private var statusItem: NSStatusItem?
     private var pendingApprovals: [String: PendingApproval] = [:]
+    private var lastActivatedBundleId: String?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         setupNotchWindow()
@@ -19,7 +20,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private func setupNotchWindow() {
         notchWindow = NotchWindow()
         notchWindow.state.onTap = { [weak self] in
-            self?.activateTerminal()
+            guard let self else { return }
+            self.pendingApprovals.removeAll()
+            self.notchWindow.updateApprovals([])
+            self.activateTerminal()
         }
     }
 
@@ -48,6 +52,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             name: NSWorkspace.didActivateApplicationNotification,
             object: nil
         )
+
+        lastActivatedBundleId = NSWorkspace.shared.frontmostApplication?.bundleIdentifier
     }
 
     private func setupStatusItem() {
@@ -116,22 +122,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
         let summary = info["summary"] as? String ?? ""
         let isNew = pendingApprovals[sessionId] == nil
-        pendingApprovals[sessionId] = PendingApproval(
-            id: sessionId,
-            toolName: toolName,
-            summary: summary
-        )
-
-        // Don't show if terminal is focused
-        if isTerminalActive() { return }
-
-        notchWindow.updateApprovals(Array(pendingApprovals.values))
 
         if isNew,
            let soundName = Constants.notificationSound,
            let sound = NSSound(named: NSSound.Name(soundName))?.copy() as? NSSound {
             sound.play()
         }
+
+        // Suppress everything visual when terminal is frontmost — don't even track
+        // the approval, so a later `clear` for another session can't cause a stale
+        // render from leftover dict entries.
+        if isTerminalFrontmost() { return }
+
+        pendingApprovals[sessionId] = PendingApproval(
+            id: sessionId,
+            toolName: toolName,
+            summary: summary
+        )
+        notchWindow.updateApprovals(Array(pendingApprovals.values))
     }
 
     @objc private func handleApprovalClear(_ notification: Notification) {
@@ -140,19 +148,35 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         else { return }
 
         pendingApprovals.removeValue(forKey: sessionId)
+
+        if isTerminalFrontmost() { return }
+
         notchWindow.updateApprovals(Array(pendingApprovals.values))
+    }
+
+    private func isTerminalFrontmost() -> Bool {
+        // Three independent signals — any positive match suppresses.
+        // why: NSWorkspace.frontmostApplication can be stale inside a
+        // DistributedNotification handler, and the cached activation id can be
+        // unseeded at launch. NSRunningApplication.isActive is the most direct.
+        let terminalIsActive = NSRunningApplication
+            .runningApplications(withBundleIdentifier: Constants.terminalBundleId)
+            .contains { $0.isActive }
+        if terminalIsActive { return true }
+        if lastActivatedBundleId == Constants.terminalBundleId { return true }
+        if NSWorkspace.shared.frontmostApplication?.bundleIdentifier == Constants.terminalBundleId { return true }
+        return false
     }
 
     // MARK: - Workspace
 
-    private func isTerminalActive() -> Bool {
-        NSWorkspace.shared.frontmostApplication?.bundleIdentifier == Constants.terminalBundleId
-    }
-
     @objc private func appDidActivate(_ notification: Notification) {
         guard let app = notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication,
-              let bundleId = app.bundleIdentifier
+              let bundleId = app.bundleIdentifier,
+              bundleId != Bundle.main.bundleIdentifier
         else { return }
+
+        lastActivatedBundleId = bundleId
 
         if bundleId == Constants.terminalBundleId {
             pendingApprovals.removeAll()
