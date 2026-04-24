@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.3.2] — 2026-04-24
+
+### Fixes
+- Suppress the notch reliably when the terminal is frontmost. The `clear` handler could re-render the notch from pending-approval state that had accumulated during suppressed `set`s (c088d5f)
+- Strengthen "terminal frontmost" detection with three independent signals so individual lies inside DistributedNotification handlers don't slip through (c088d5f)
+- Tap now always clears and hides the notch before activating the terminal, so clicking while the terminal is already frontmost dismisses instead of no-op'ing (c088d5f)
+- Sound plays independently of visual suppression (c088d5f)
+
 ## [0.3.1] — 2026-03-31
 
 ### Fixes
