@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.4.0] — 2026-08-07
+
+### Features
+- Add a neutral adapter-based notification protocol with bundled Claude Code and Pi adapter definitions and icons
+- Add a global Pi extension that lets agents arm a notification for delivery after `agent_settled`
+- Route Claude Code hooks through the bundled Claude adapter while preserving existing hook behavior
+
+### Other
+- Replace approval-specific pending state and rendering names with notification-specific names
+- Refresh the app icon and use the bundled bot SVG for the menu bar icon
+- Remove the unused checked-in `AppIcon.icns`
+- Install the current CLI inside source-built app bundles and migrate existing Pester Claude hooks during installation
+
 ## [0.3.2] — 2026-04-24
 
 ### Fixes

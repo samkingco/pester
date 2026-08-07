@@ -7,10 +7,10 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 # Detect CLI location: app bundle, Homebrew, or local install
 if [ -f "$SCRIPT_DIR/../MacOS/pester-cli" ]; then
     CLI="$SCRIPT_DIR/../MacOS/pester-cli"
-elif [ -f "/Applications/Pester.app/Contents/MacOS/pester-cli" ]; then
-    CLI="/Applications/Pester.app/Contents/MacOS/pester-cli"
 elif [ -f "$HOME/Applications/Pester.app/Contents/MacOS/pester-cli" ]; then
     CLI="$HOME/Applications/Pester.app/Contents/MacOS/pester-cli"
+elif [ -f "/Applications/Pester.app/Contents/MacOS/pester-cli" ]; then
+    CLI="/Applications/Pester.app/Contents/MacOS/pester-cli"
 elif command -v pester-cli &>/dev/null; then
     CLI="$(command -v pester-cli)"
 elif [ -f "$HOME/.pester/bin/pester-cli" ]; then
@@ -29,13 +29,7 @@ if [ ! -f "$SETTINGS" ]; then
     echo '{}' > "$SETTINGS"
 fi
 
-# Check if hooks already configured
-if grep -q "pester-cli" "$SETTINGS" 2>/dev/null; then
-    echo "Hooks already configured in $SETTINGS"
-    exit 0
-fi
-
-# Merge hooks into existing settings using python3 (ships with macOS)
+# Replace Pester's Claude adapter hooks using python3 (ships with macOS)
 python3 - "$SETTINGS" "$CLI" <<'PYTHON'
 import json, sys
 
@@ -47,31 +41,49 @@ with open(settings_path) as f:
 
 hooks = settings.get("hooks", {})
 
+def without_pester(entries):
+    cleaned = []
+    for entry in entries:
+        entry_hooks = entry.get("hooks")
+        if not isinstance(entry_hooks, list):
+            cleaned.append(entry)
+            continue
+        remaining = [
+            hook for hook in entry_hooks
+            if "pester-cli" not in hook.get("command", "")
+        ]
+        if remaining:
+            cleaned.append({**entry, "hooks": remaining})
+    return cleaned
+
+for event in ["PermissionRequest", "Notification", "PostToolUse", "Stop"]:
+    hooks[event] = without_pester(hooks.get(event, []))
+
 hooks["PermissionRequest"] = hooks.get("PermissionRequest", []) + [
     {
         "matcher": "",
-        "hooks": [{"type": "command", "command": f"{cli_path} set"}]
+        "hooks": [{"type": "command", "command": f"{cli_path} claude set"}]
     }
 ]
 
 hooks["Notification"] = hooks.get("Notification", []) + [
     {
         "matcher": "^(?!permission_prompt)",
-        "hooks": [{"type": "command", "command": f"{cli_path} set"}]
+        "hooks": [{"type": "command", "command": f"{cli_path} claude set"}]
     }
 ]
 
 hooks["PostToolUse"] = hooks.get("PostToolUse", []) + [
     {
         "matcher": "",
-        "hooks": [{"type": "command", "command": f"{cli_path} clear"}]
+        "hooks": [{"type": "command", "command": f"{cli_path} claude clear"}]
     }
 ]
 
 hooks["Stop"] = hooks.get("Stop", []) + [
     {
         "matcher": "",
-        "hooks": [{"type": "command", "command": f"{cli_path} clear"}]
+        "hooks": [{"type": "command", "command": f"{cli_path} claude clear"}]
     }
 ]
 

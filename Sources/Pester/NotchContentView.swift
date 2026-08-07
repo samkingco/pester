@@ -3,7 +3,7 @@ import SwiftUI
 struct NotchContentView: View {
     @ObservedObject var state: NotchState
 
-    private var isOpen: Bool { !state.approvals.isEmpty }
+    private var isOpen: Bool { !state.notifications.isEmpty }
 
     private var notchW: CGFloat { Constants.notchWidth }
     private var notchH: CGFloat { Constants.notchHeight }
@@ -14,8 +14,8 @@ struct NotchContentView: View {
 
     private var shapeHeight: CGFloat {
         guard isOpen else { return notchH }
-        let rows = CGFloat(min(state.approvals.count, 5))
-        let header: CGFloat = state.approvals.count > 1 ? Constants.countHeaderHeight : 0
+        let rows = CGFloat(min(state.notifications.count, 5))
+        let header: CGFloat = state.notifications.count > 1 ? Constants.countHeaderHeight : 0
         return notchH + 8 + header + rows * Constants.rowHeight + Constants.bottomPadding
     }
 
@@ -41,7 +41,7 @@ struct NotchContentView: View {
         .frame(width: Constants.expandedWidth)
         .frame(maxHeight: .infinity, alignment: .top)
         .animation(.spring(duration: 0.35, bounce: 0.12), value: isOpen)
-        .animation(.spring(duration: 0.3, bounce: 0.1), value: state.approvals.count)
+        .animation(.spring(duration: 0.3, bounce: 0.1), value: state.notifications.count)
     }
 
     private var contentRows: some View {
@@ -49,15 +49,15 @@ struct NotchContentView: View {
             Spacer()
                 .frame(height: notchH + 8)
 
-            if state.approvals.count > 1 {
-                Text("\(state.approvals.count) sessions waiting")
+            if state.notifications.count > 1 {
+                Text("\(state.notifications.count) sessions waiting")
                     .font(.system(size: 12, weight: .medium))
                     .foregroundStyle(.secondary)
                     .frame(height: Constants.countHeaderHeight, alignment: .leading)
             }
 
-            ForEach(state.approvals.prefix(5)) { approval in
-                ApprovalRow(approval: approval)
+            ForEach(state.notifications.prefix(5)) { notification in
+                NotificationRow(notification: notification)
             }
         }
         .padding(.horizontal, 24)
@@ -65,20 +65,20 @@ struct NotchContentView: View {
     }
 }
 
-struct ApprovalRow: View {
-    let approval: PendingApproval
+struct NotificationRow: View {
+    let notification: PendingNotification
 
     var body: some View {
         HStack(spacing: 12) {
-            ClaudeMascotView(size: 16)
+            AdapterIconView(adapter: notification.adapter, size: 16)
 
             HStack(spacing: 12) {
-                Text(approval.toolName)
+                Text(notification.title)
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(.white)
 
-                if !approval.summary.isEmpty {
-                    Text(approval.summary)
+                if !notification.summary.isEmpty {
+                    Text(notification.summary)
                         .font(.system(size: 12, design: .monospaced))
                         .foregroundStyle(.gray)
                         .lineLimit(1)

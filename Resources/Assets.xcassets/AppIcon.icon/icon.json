@@ -4,37 +4,31 @@
   },
   "groups" : [
     {
-      "layers" : [
-        {
-          "image-name" : "4_pester.svg",
-          "name" : "4_pester"
-        }
-      ],
-      "shadow" : {
-        "kind" : "neutral",
-        "opacity" : 0.5
-      },
-      "translucency" : {
-        "enabled" : false,
-        "value" : 0.5
-      }
-    },
-    {
       "blur-material" : 0.5,
       "layers" : [
         {
-          "glass" : true,
-          "hidden" : false,
-          "image-name-specializations" : [
+          "fill-specializations" : [
             {
-              "value" : "3_pester.svg"
+              "value" : {
+                "solid" : "srgb:1.00000,1.00000,1.00000,1.00000"
+              }
             },
             {
               "appearance" : "dark",
-              "value" : "3_pester_dark.svg"
+              "value" : "automatic"
             }
           ],
-          "name" : "3_pester_dark"
+          "glass" : true,
+          "hidden" : false,
+          "image-name" : "bot.svg",
+          "name" : "bot",
+          "position" : {
+            "scale" : 20,
+            "translation-in-points" : [
+              0,
+              0
+            ]
+          }
         }
       ],
       "lighting" : "individual",

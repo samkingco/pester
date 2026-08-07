@@ -1,10 +1,11 @@
 import AppKit
+import PesterProtocol
 import ServiceManagement
 
 final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var notchWindow: NotchWindow!
     private var statusItem: NSStatusItem?
-    private var pendingApprovals: [String: PendingApproval] = [:]
+    private var pendingNotifications: [String: PendingNotification] = [:]
     private var lastActivatedBundleId: String?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -21,8 +22,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         notchWindow = NotchWindow()
         notchWindow.state.onTap = { [weak self] in
             guard let self else { return }
-            self.pendingApprovals.removeAll()
-            self.notchWindow.updateApprovals([])
+            self.pendingNotifications.removeAll()
+            self.notchWindow.updateNotifications([])
             self.activateTerminal()
         }
     }
@@ -32,15 +33,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
         center.addObserver(
             self,
-            selector: #selector(handleApprovalSet(_:)),
-            name: Notification.Name("com.pester.approval.set"),
+            selector: #selector(handleNotificationSet(_:)),
+            name: PesterProtocol.setNotification,
             object: nil
         )
 
         center.addObserver(
             self,
-            selector: #selector(handleApprovalClear(_:)),
-            name: Notification.Name("com.pester.approval.clear"),
+            selector: #selector(handleNotificationClear(_:)),
+            name: PesterProtocol.clearNotification,
             object: nil
         )
     }
@@ -58,7 +59,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     private func setupStatusItem() {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
-        statusItem?.button?.image = ClaudeIcon.menuBarImage()
+        statusItem?.button?.image = MenuBarIcon.image()
 
         let menu = NSMenu()
         menu.delegate = self
@@ -114,14 +115,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     // MARK: - Distributed Notifications
 
-    @objc private func handleApprovalSet(_ notification: Notification) {
+    @objc private func handleNotificationSet(_ notification: Notification) {
         guard let info = notification.userInfo,
-              let sessionId = info["session_id"] as? String,
-              let toolName = info["tool_name"] as? String
+              let id = info[PesterProtocol.Key.id] as? String,
+              let adapterId = info[PesterProtocol.Key.adapterId] as? String,
+              let adapter = AdapterID(rawValue: adapterId),
+              let title = info[PesterProtocol.Key.title] as? String
         else { return }
 
-        let summary = info["summary"] as? String ?? ""
-        let isNew = pendingApprovals[sessionId] == nil
+        let key = notificationKey(adapter: adapter, id: id)
+        let summary = info[PesterProtocol.Key.summary] as? String ?? ""
+        let isNew = pendingNotifications[key] == nil
 
         if isNew,
            let soundName = Constants.notificationSound,
@@ -130,28 +134,35 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
 
         // Suppress everything visual when terminal is frontmost — don't even track
-        // the approval, so a later `clear` for another session can't cause a stale
+        // the notification, so a later `clear` for another session can't cause a stale
         // render from leftover dict entries.
         if isTerminalFrontmost() { return }
 
-        pendingApprovals[sessionId] = PendingApproval(
-            id: sessionId,
-            toolName: toolName,
+        pendingNotifications[key] = PendingNotification(
+            id: key,
+            adapter: .bundled(adapter),
+            title: title,
             summary: summary
         )
-        notchWindow.updateApprovals(Array(pendingApprovals.values))
+        notchWindow.updateNotifications(Array(pendingNotifications.values))
     }
 
-    @objc private func handleApprovalClear(_ notification: Notification) {
+    @objc private func handleNotificationClear(_ notification: Notification) {
         guard let info = notification.userInfo,
-              let sessionId = info["session_id"] as? String
+              let id = info[PesterProtocol.Key.id] as? String,
+              let adapterId = info[PesterProtocol.Key.adapterId] as? String,
+              let adapter = AdapterID(rawValue: adapterId)
         else { return }
 
-        pendingApprovals.removeValue(forKey: sessionId)
+        pendingNotifications.removeValue(forKey: notificationKey(adapter: adapter, id: id))
 
         if isTerminalFrontmost() { return }
 
-        notchWindow.updateApprovals(Array(pendingApprovals.values))
+        notchWindow.updateNotifications(Array(pendingNotifications.values))
+    }
+
+    private func notificationKey(adapter: AdapterID, id: String) -> String {
+        "\(adapter.rawValue):\(id)"
     }
 
     private func isTerminalFrontmost() -> Bool {
@@ -179,8 +190,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         lastActivatedBundleId = bundleId
 
         if bundleId == Constants.terminalBundleId {
-            pendingApprovals.removeAll()
-            notchWindow.updateApprovals([])
+            pendingNotifications.removeAll()
+            notchWindow.updateNotifications([])
         }
     }
 
@@ -195,36 +206,32 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     @objc private func triggerTest() {
-        let tools: [(String, String)] = [
-            ("Bash", "rm -rf node_modules && npm install"),
-            ("Bash", "docker compose up -d --build"),
-            ("Edit", "src/components/Dashboard.tsx"),
-            ("Write", "tests/integration/auth.test.ts"),
-            ("Bash", "git push origin feature/notch-ui"),
-            ("Edit", "Package.swift"),
-            ("Bash", "swift build -c release"),
-            ("Write", "Sources/Pester/NotchWindow.swift"),
-            ("Bash", "curl -X POST https://api.example.com/deploy"),
-            ("Edit", "config/production.yml"),
+        let samples: [(AdapterID, String, String)] = [
+            (.claude, "Bash", "rm -rf node_modules && npm install"),
+            (.claude, "Edit", "src/components/Dashboard.tsx"),
+            (.claude, "Write", "tests/integration/auth.test.ts"),
+            (.pi, "Finished", "Implemented the notification adapter"),
+            (.pi, "Finished", "Tests passed"),
         ]
 
-        let (tool, summary) = tools.randomElement()!
-        let sessionId = "test-\(UUID().uuidString.prefix(8))"
+        let (adapter, title, summary) = samples.randomElement()!
+        let id = "test-\(UUID().uuidString.prefix(8))"
 
         DistributedNotificationCenter.default().postNotificationName(
-            Notification.Name("com.pester.approval.set"),
+            PesterProtocol.setNotification,
             object: nil,
             userInfo: [
-                "session_id": sessionId,
-                "tool_name": tool,
-                "summary": summary,
+                PesterProtocol.Key.id: id,
+                PesterProtocol.Key.adapterId: adapter.rawValue,
+                PesterProtocol.Key.title: title,
+                PesterProtocol.Key.summary: summary,
             ]
         )
     }
 
     @objc private func clearAll() {
-        pendingApprovals.removeAll()
-        notchWindow.updateApprovals([])
+        pendingNotifications.removeAll()
+        notchWindow.updateNotifications([])
     }
 
     // MARK: - NSMenuDelegate

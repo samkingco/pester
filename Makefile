@@ -23,8 +23,10 @@ install: build assets
 	@mkdir -p "$(APP_DIR)/Contents/MacOS"
 	@mkdir -p "$(APP_DIR)/Contents/Resources"
 	@cp .build/release/Pester "$(APP_DIR)/Contents/MacOS/"
+	@cp .build/release/pester-cli "$(APP_DIR)/Contents/MacOS/"
 	@sed 's/VERSION_PLACEHOLDER/$(VERSION)/g' Resources/Info.plist > "$(APP_DIR)/Contents/Info.plist"
 	@cp .build/assets/Assets.car "$(APP_DIR)/Contents/Resources/"
+	@cp Resources/Assets.xcassets/AppIcon.icon/Assets/bot.svg "$(APP_DIR)/Contents/Resources/MenuBarIcon.svg"
 	@mkdir -p "$(CLI_DIR)"
 	@cp .build/release/pester-cli "$(CLI_DIR)/"
 	@./scripts/setup-hooks.sh
@@ -46,6 +48,7 @@ dmg: build assets
 	@cp .build/release/pester-cli .build/dmg/Pester.app/Contents/MacOS/
 	@sed 's/VERSION_PLACEHOLDER/$(VERSION)/g' Resources/Info.plist > .build/dmg/Pester.app/Contents/Info.plist
 	@cp .build/assets/Assets.car .build/dmg/Pester.app/Contents/Resources/
+	@cp Resources/Assets.xcassets/AppIcon.icon/Assets/bot.svg .build/dmg/Pester.app/Contents/Resources/MenuBarIcon.svg
 	@cp scripts/setup-hooks.sh .build/dmg/Pester.app/Contents/Resources/
 	@rm -f .build/Pester-$(VERSION).dmg
 	@create-dmg \

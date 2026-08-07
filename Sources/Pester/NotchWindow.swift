@@ -39,17 +39,17 @@ final class NotchWindow {
         resizeWindow(height: Constants.notchHeight)
     }
 
-    func updateApprovals(_ approvals: [PendingApproval]) {
-        if !approvals.isEmpty {
-            let targetHeight = contentHeight(for: approvals.count)
-            let currentHeight = contentHeight(for: state.approvals.count)
+    func updateNotifications(_ notifications: [PendingNotification]) {
+        if !notifications.isEmpty {
+            let targetHeight = contentHeight(for: notifications.count)
+            let currentHeight = contentHeight(for: state.notifications.count)
 
             // Grow window BEFORE updating state so expand animation isn't clipped
             if targetHeight > currentHeight || !isVisible {
                 resizeWindow(height: targetHeight)
             }
 
-            state.approvals = approvals
+            state.notifications = notifications
             panel.ignoresMouseEvents = false
 
             if !isVisible {
@@ -60,17 +60,17 @@ final class NotchWindow {
             // Shrink window AFTER animation so collapse isn't clipped
             if targetHeight < currentHeight {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { [weak self] in
-                    guard let self, !self.state.approvals.isEmpty else { return }
-                    self.resizeWindow(height: self.contentHeight(for: self.state.approvals.count))
+                    guard let self, !self.state.notifications.isEmpty else { return }
+                    self.resizeWindow(height: self.contentHeight(for: self.state.notifications.count))
                 }
             }
         } else if isVisible {
-            state.approvals = []
+            state.notifications = []
             panel.ignoresMouseEvents = true
 
             // Wait for collapse animation, then hide and shrink
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { [weak self] in
-                guard let self, self.state.approvals.isEmpty else { return }
+                guard let self, self.state.notifications.isEmpty else { return }
                 self.panel.orderOut(nil)
                 self.isVisible = false
                 self.resizeWindow(height: Constants.notchHeight)

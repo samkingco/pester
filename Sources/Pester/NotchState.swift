@@ -1,6 +1,6 @@
 import Foundation
 
 final class NotchState: ObservableObject {
-    @Published var approvals: [PendingApproval] = []
+    @Published var notifications: [PendingNotification] = []
     var onTap: (() -> Void)?
 }

@@ -1,4 +1,3 @@
-import AppKit
 import SwiftUI
 
 enum ClaudeIcon {
@@ -61,34 +60,6 @@ enum ClaudeIcon {
         path.closeSubpath()
 
         return path
-    }
-
-    static func menuBarImage(size: CGFloat = 18) -> NSImage {
-        let image = NSImage(size: NSSize(width: size, height: size))
-        image.lockFocus()
-
-        guard let ctx = NSGraphicsContext.current?.cgContext else {
-            image.unlockFocus()
-            return image
-        }
-
-        // Flip Y for NSImage coordinate system
-        ctx.saveGState()
-        ctx.translateBy(x: 0, y: size)
-        ctx.scaleBy(x: 1, y: -1)
-
-        let rect = CGRect(x: 0, y: 0, width: size, height: size)
-        let path = logoPath(in: rect)
-
-        ctx.setFillColor(NSColor.black.cgColor)
-        ctx.addPath(path.cgPath)
-        ctx.fillPath(using: .evenOdd)
-
-        ctx.restoreGState()
-
-        image.unlockFocus()
-        image.isTemplate = true
-        return image
     }
 }
 
